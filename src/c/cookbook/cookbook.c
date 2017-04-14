@@ -39,7 +39,7 @@ void main_menu()
 	printf("\t3) View recipes\n\n");
 
 	int input = 0;
-	while (input < 49 || input > 51)
+	while (input < '0' || input > '3')
 	{
 		input = getchar();
 	}
@@ -47,7 +47,7 @@ void main_menu()
 	switch(input){
 		case '1' : printf("1\n"); break;
 		case '2' : printf("2\n"); break;
-		case '3' : load_recipes("./recipes"); view_recipes(0); break;
+		case '3' : load_recipes("./recipes");view_recipes(0); break;
 	}
 }
 
@@ -70,19 +70,16 @@ void view_recipes(int pagenum)
 	}
 	else {
 		int i;
-		for (i = pagenum * 7; i < (7 - (NUM_OF_RECIPES % 7)); i = i + 1)
+		for (i = 0; i < NUM_OF_RECIPES; i = i + 1)
 		{
-			printf("\t%d) %s\n", (i + 1), RECIPES_LIST[i]);
+			printf("\t%d) %s\n", (i + 1), RECIPES_LIST[i + 7 * pagenum]);
 		}
 
 		if (NUM_OF_RECIPES > (7 * (pagenum + 1)))
 		{
 			printf("\t9) Next Page\n");
-			printf("\t0) Back to Main Menu\n\n");
 		}
-		else {
-			printf("\t0) Back to Main Menu\n\n");	
-		}
+		printf("\t0) Back to Main Menu\n\n");	
 
 		//printf("\t1) Print the number 3\n");
 		//printf("\t2) Print the number 4\n");
@@ -90,7 +87,7 @@ void view_recipes(int pagenum)
 		//printf("\t4) Go back to main menu.\n\n");
 
 		int input = 0;
-		while (input < 48 || input (48 + (NUM_OF_RECIPES % 7)))
+		while (input < '0' || input > '9')
 		{
 			input = getchar();
 		}
@@ -153,6 +150,11 @@ void load_recipes(char dirname[])
 	{
 		int i;
 		for (i = 0; ( direntp = readdir( dir_ptr ) ) != NULL; i = i + 1){
+			if (!strcmp(direntp->d_name,".") || !strcmp(direntp->d_name,".."))
+				{
+					i--;
+					continue;
+				}
 			RECIPES_LIST[i] = direntp->d_name;
 			NUM_OF_RECIPES = i + 1;
 		}
