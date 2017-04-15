@@ -12,6 +12,7 @@
 #include	<sys/types.h>
 #include <curses.h>
 #include	<stdlib.h>
+#include	<nfc/nfc.h>;
 
 int CURRENT_STATE;
 char *RECIPES_LIST[30];
@@ -195,8 +196,6 @@ void load_recipes(char dirname[])
 	}
 }
 
-#include <stdlib.h>
-#include <nfc/nfc.h>
 
 char *get_hex(const uint8_t *pbtData, const size_t szBytes, char[] UID)
 {
