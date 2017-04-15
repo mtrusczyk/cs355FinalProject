@@ -197,7 +197,7 @@ void load_recipes(char dirname[])
 }
 
 
-char *get_hex(const uint8_t *pbtData, const size_t szBytes, char[] UID)
+char *get_hex(const uint8_t *pbtData, const size_t szBytes, char *UID)
 {
   size_t  szPos;
 
