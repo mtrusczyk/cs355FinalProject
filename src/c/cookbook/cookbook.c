@@ -10,9 +10,9 @@
 #include	<fcntl.h>
 #include	<dirent.h>
 #include	<sys/types.h>
-#include <curses.h>
+#include	<curses.h>
 #include	<stdlib.h>
-#include	<nfc/nfc.h>;
+#include	<nfc/nfc.h>
 
 int CURRENT_STATE;
 char *RECIPES_LIST[30];
@@ -21,8 +21,13 @@ int NUM_OF_RECIPES;
 void main_menu();
 void load_recipes(char[]);
 void view_recipes(int);
-char *getUID();
-char *get_hex(const uint8_t, const size_t, char[]);
+void getUID(unsigned char[]);
+
+void get_hex(uint8_t *pbtData, size_t szBytes, unsigned char *uid)
+{
+  sprintf(uid, "%02x%02x%02x%02x",pbtData[0],pbtData[1],pbtData[2],pbtData[3]);
+}
+
 
 int main()
 {
@@ -33,7 +38,7 @@ int main()
 
 	WINDOW * mainwin;
 
-    
+
     /*  Initialize ncurses  */
 
     if ( (mainwin = initscr()) == NULL ) {
@@ -59,13 +64,15 @@ void main_menu()
 	refresh();
 
 	int input = 0;
+	unsigned char uid[24];
+	uid[0] = 0;
 	while (input < '0' || input > '3')
 	{
 		input = getchar();
 	}
 
 	switch(input){
-		case '1' : printf("%s",getUID()); break;
+		case '1' : getUID(uid); printf("%s\n",uid); break;
 		case '2' : printf("2\n"); break;
 		case '3' : load_recipes("./recipes");view_recipes(0); break;
 	}
@@ -77,7 +84,7 @@ void view_recipes(int pagenum)
 	move(3,0);
 	addstr("Recipes on file:");
 
-	if (NUM_OF_RECIPES < 1 || NUM_OF_RECIPES == NULL)
+	if (NUM_OF_RECIPES < 1 || NUM_OF_RECIPES == (int)NULL)
 	{
 		move(5,0);
 		addstr("No recipes found...");
@@ -107,10 +114,10 @@ void view_recipes(int pagenum)
 			move(5+i,4);
 			addstr("9) Next Page\n");
 		}
-		else 
+		else
 		{
 			move(5+i,4);
-			addstr("0) Back to Main Menu\n\n");	
+			addstr("0) Back to Main Menu\n\n");
 		}
 		refresh();
 
@@ -124,7 +131,7 @@ void view_recipes(int pagenum)
 		{
 			input = getchar();
 		}
-		
+
 
 		switch(input){
 			case '1' : printf("3\n"); break;
@@ -142,7 +149,7 @@ void view_recipes(int pagenum)
 
 
 set_cr_noecho_mode()
-/* 
+/*
  * purpose: put file descriptor 0 into chr-by-chr mode and noecho mode
  *  method: use bits in termios
  */
@@ -168,8 +175,8 @@ tty_mode(int how)
 		stored = 1;
 	}
 	else if ( stored ) {
-		tcsetattr(0, TCSANOW, &original_mode); 
-		fcntl( 0, F_SETFL, original_flags);	
+		tcsetattr(0, TCSANOW, &original_mode);
+		fcntl( 0, F_SETFL, original_flags);
 	}
 }
 
@@ -196,22 +203,10 @@ void load_recipes(char dirname[])
 	}
 }
 
-
-char *get_hex(const uint8_t *pbtData, const size_t szBytes, char *UID)
-{
-  size_t  szPos;
-
-  for (szPos = 0; szPos < szBytes; szPos++) {
-    strcat(UID, pbtData[szPos]);
-  }
-}
-
-
-char *getUID()
+void getUID(unsigned char *uid)
 {
   nfc_device *pnd;
   nfc_target nt;
-  char UID[8];
 
   // Allocate only a pointer to nfc_context
   nfc_context *context;
@@ -249,12 +244,10 @@ char *getUID()
     .nbr = NBR_106,
   };
   if (nfc_initiator_select_passive_target(pnd, nmMifare, NULL, 0, &nt) > 0) {
-    printf("       UID (NFCID%c): ", (nt.nti.nai.abtUid[0] == 0x08 ? '3' : '1'));
-    get_hex(nt.nti.nai.abtUid, nt.nti.nai.szUidLen, UID);
+    get_hex(nt.nti.nai.abtUid, nt.nti.nai.szUidLen, uid);
   }
   // Close NFC device
   nfc_close(pnd);
   // Release the context
   nfc_exit(context);
-  return UID;
 }
