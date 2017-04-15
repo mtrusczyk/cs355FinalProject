@@ -226,7 +226,6 @@ char *getUID()
 
   // Display libnfc version
   const char *acLibnfcVersion = nfc_version();
-  (void)argc;
 
   // Open, using the first available NFC device which can be in order of selection:
   //   - default device specified using environment variable or
