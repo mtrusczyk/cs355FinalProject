@@ -21,7 +21,7 @@ void main_menu();
 void load_recipes(char[]);
 void view_recipes(int);
 char *getUID();
-char *get_hex(const uint8_t, const size_t, char[])
+char *get_hex(const uint8_t, const size_t, char[]);
 
 int main()
 {
