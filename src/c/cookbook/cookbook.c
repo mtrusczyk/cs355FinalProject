@@ -20,6 +20,8 @@ int NUM_OF_RECIPES;
 void main_menu();
 void load_recipes(char[]);
 void view_recipes(int);
+char *getUID();
+char *get_hex(const uint8_t, const size_t, char[])
 
 int main()
 {
@@ -62,7 +64,7 @@ void main_menu()
 	}
 
 	switch(input){
-		case '1' : printf("1\n"); break;
+		case '1' : printf("%s",getUID()); break;
 		case '2' : printf("2\n"); break;
 		case '3' : load_recipes("./recipes");view_recipes(0); break;
 	}
@@ -196,19 +198,17 @@ void load_recipes(char dirname[])
 #include <stdlib.h>
 #include <nfc/nfc.h>
 
-static void
-print_hex(const uint8_t *pbtData, const size_t szBytes)
+char *get_hex(const uint8_t *pbtData, const size_t szBytes, char[] UID)
 {
   size_t  szPos;
 
   for (szPos = 0; szPos < szBytes; szPos++) {
-    printf("%02x  ", pbtData[szPos]);
+    strcat(UID, pbtData[szPos]);
   }
-  printf("\n");
 }
 
 
-char *getUID(int argc, const char *argv[])
+char *getUID()
 {
   nfc_device *pnd;
   nfc_target nt;
