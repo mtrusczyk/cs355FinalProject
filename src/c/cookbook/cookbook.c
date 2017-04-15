@@ -10,6 +10,8 @@
 #include	<fcntl.h>
 #include	<dirent.h>
 #include	<sys/types.h>
+#include <curses.h>
+#include	<stdlib.h>
 
 int CURRENT_STATE;
 char *RECIPES_LIST[30];
@@ -26,17 +28,32 @@ int main()
 	tty_mode(0);
 	set_cr_noecho_mode();
 
+	WINDOW * mainwin;
+
+    
+    /*  Initialize ncurses  */
+
+    if ( (mainwin = initscr()) == NULL ) {
+	fprintf(stderr, "Error initialising ncurses.\n");
+	exit(1);
+    }
+
 	main_menu();
 	tty_mode(1);
 }
 
 void main_menu()
 {
-	system("clear");
-	printf("Welcome to the NFC CookBook...\n\n");
-	printf("\t1) Scan card\n");
-	printf("\t2) Assign new card\n");
-	printf("\t3) View recipes\n\n");
+	clear();
+	move(0,0);
+	addstr("Welcome to the NFC CookBook...");
+	move(2,4);
+	addstr("1) Scan card");
+	move(3,4);
+	addstr("2) Assign new card\n");
+	move(4,4);
+	addstr("3) View recipes\n\n");
+	refresh();
 
 	int input = 0;
 	while (input < '0' || input > '3')
@@ -53,13 +70,17 @@ void main_menu()
 
 void view_recipes(int pagenum)
 {
-	system("clear");
-	printf("Recipes on file:\n\n");
+	clear();
+	move(3,0);
+	addstr("Recipes on file:");
 
 	if (NUM_OF_RECIPES < 1 || NUM_OF_RECIPES == NULL)
 	{
-		printf("No recipes found...\n\n");
-		printf("\t0) Back to Main Menu\n");
+		move(5,0);
+		addstr("No recipes found...");
+		move(7,4);
+		addstr("0) Back to Main Menu");
+		refresh();
 
 		int input = 0;
 		while (input != 48)
@@ -70,16 +91,25 @@ void view_recipes(int pagenum)
 	}
 	else {
 		int i;
-		for (i = 0; i < NUM_OF_RECIPES; i = i + 1)
+		char message[1024];
+		for (i = 0; (i + 3*pagenum) < NUM_OF_RECIPES && i < 3; i = i + 1)
 		{
-			printf("\t%d) %s\n", (i + 1), RECIPES_LIST[i + 7 * pagenum]);
+			move(5+i,4);
+			sprintf(message,"%d) %s\n", (i + 1), RECIPES_LIST[i + 3 * pagenum]);
+			addstr(message);
 		}
 
-		if (NUM_OF_RECIPES > (7 * (pagenum + 1)))
+		if (NUM_OF_RECIPES > (3 * (pagenum + 1)))
 		{
-			printf("\t9) Next Page\n");
+			move(5+i,4);
+			addstr("9) Next Page\n");
 		}
-		printf("\t0) Back to Main Menu\n\n");	
+		else 
+		{
+			move(5+i,4);
+			addstr("0) Back to Main Menu\n\n");	
+		}
+		refresh();
 
 		//printf("\t1) Print the number 3\n");
 		//printf("\t2) Print the number 4\n");
