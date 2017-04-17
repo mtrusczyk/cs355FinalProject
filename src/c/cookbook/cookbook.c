@@ -13,6 +13,8 @@
 #include <curses.h>
 #include	<stdlib.h>
 
+#define BUFFERSIZE 4096
+
 int CURRENT_STATE;
 char *RECIPES_LIST[30];
 int NUM_OF_RECIPES;
@@ -20,6 +22,7 @@ int NUM_OF_RECIPES;
 void main_menu();
 void load_recipes(char[]);
 void view_recipes(int);
+void print_recipe(char[]);
 
 int main()
 {
@@ -124,13 +127,9 @@ void view_recipes(int pagenum)
 		
 
 		switch(input){
-			case '1' : printf("3\n"); break;
-			case '2' : printf("4\n"); break;
+			case '1' : printf("3\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
+			case '2' : printf("4\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
 			case '3' : printf("5\n"); break;
-			case '4' :
-			case '5' :
-			case '6' :
-			case '7' :
 			case '9' : view_recipes(pagenum + 1); break;
 			case '0' : main_menu(); break;
 		}
@@ -191,4 +190,41 @@ void load_recipes(char dirname[])
 
 		closedir(dir_ptr);
 	}
+}
+
+void print_recipe(char filename[])
+{
+	int in_fd, out_fd, n_chars;
+	char buf[BUFFERSIZE];
+	char cat[BUFFERSIZE];
+
+	char file_path[1024];
+	sprintf(file_path, "./recipes/%s", filename);
+
+	if ((in_fd = open(file_path, O_RDONLY)) == -1)
+	{
+		perror("Cannot open source file");
+		return;
+	}
+
+	while ((n_chars = read(in_fd, buf, BUFFERSIZE)) > 0)
+	{
+		strcat(cat, buf);
+	}
+
+	if (n_chars == -1)
+	{
+		perror("Read error");
+		return;
+	}
+
+	if (close(in_fd) == -1)
+	{
+		perror("Error closing file");
+		return;
+	}
+
+	addstr(cat);
+	refresh();
+	//printf("%s\n", cat);
 }
