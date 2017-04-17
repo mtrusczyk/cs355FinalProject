@@ -13,28 +13,48 @@
 #include	<curses.h>
 #include	<stdlib.h>
 #include	<nfc/nfc.h>
+#include 	<wiringPi.h>
+#include	<errno.h>
+
+#define BUFFERSIZE 4096
+#define BUTTON1 0
+#define BUTTON2 1
+#define BUTTON3 2
+#define BUTTON4 3
 
 int CURRENT_STATE;
 char *RECIPES_LIST[30];
 int NUM_OF_RECIPES;
+int button = 0;
+int pagenum;
 
 void main_menu();
 void load_recipes(char[]);
 void view_recipes(int);
+void print_recipe(char[]);
 void getUID(unsigned char[]);
+int  readButton(int pin);
+void setupButton(int pin);
+void waitForInput();
 
 void get_hex(uint8_t *pbtData, size_t szBytes, unsigned char *uid)
 {
   sprintf(uid, "%02x%02x%02x%02x",pbtData[0],pbtData[1],pbtData[2],pbtData[3]);
 }
 
-
 int main()
 {
 	CURRENT_STATE = 0;
 
-	tty_mode(0);
-	set_cr_noecho_mode();
+	if (wiringPiSetup () < 0)
+  	{
+    	fprintf (stderr, "Unable to setup wiringPi: %s\n", strerror (errno)) ;
+    	return 1 ;
+  	}
+  	setupButton(BUTTON1);
+  	setupButton(BUTTON2);
+  	setupButton(BUTTON3);
+  	setupButton(BUTTON4);
 
 	WINDOW * mainwin;
 
@@ -47,11 +67,69 @@ int main()
     }
 
 	main_menu();
-	tty_mode(1);
+	waitForInput();
+}
+
+void decodeState()
+{
+      	if (CURRENT_STATE == 1)
+      	{
+        	switch(button){
+          		case 1: printf("1\n");button = 0; break;
+          		case 2: printf("2\n"); break;
+          		case 3: load_recipes("./recipes");view_recipes(0); break;
+        	}
+      	}
+
+      	if (CURRENT_STATE == 2)
+      	{
+      		switch(button){
+				case 1:button = 0; printf("3\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
+				case 2:button = 0; printf("4\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
+				case 3:button = 0; printf("5\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[2 + 3 * pagenum]); break;
+				case 4:button = 0; view_recipes(pagenum++); break;
+			}
+      	}
+      	if (CURRENT_STATE == 3)
+      	{
+		switch(button){
+		      		case '1' : printf("3\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
+				case '2' : printf("4\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
+				case '3' : printf("5\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[2 + 3 * pagenum]); break;
+				case '4' : main_menu(); break;
+		}
+      	}
+	delay(250);
+}
+
+void waitForInput()
+{
+  for(;;)
+  {
+    if (button)
+      decodeState();
+    else
+    {
+      	if (!readButton(BUTTON1))
+        	button = 1;
+      	else if (!readButton(BUTTON2))
+        	button = 2;
+      	else if (!readButton(BUTTON3))
+        	button = 3;
+
+      	else if (!readButton(BUTTON4))
+        	button = 4;
+
+    }
+  }
+
 }
 
 void main_menu()
 {
+	button = 0;
+	CURRENT_STATE = 1;
+	pagenum = 0;
 	clear();
 	move(0,0);
 	addstr("Welcome to the NFC CookBook...");
@@ -63,23 +141,12 @@ void main_menu()
 	addstr("3) View recipes\n\n");
 	refresh();
 
-	int input = 0;
-	unsigned char uid[24];
-	uid[0] = 0;
-	while (input < '0' || input > '3')
-	{
-		input = getchar();
-	}
-
-	switch(input){
-		case '1' : getUID(uid); printf("%s\n",uid); break;
-		case '2' : printf("2\n"); break;
-		case '3' : load_recipes("./recipes");view_recipes(0); break;
-	}
 }
 
 void view_recipes(int pagenum)
 {
+	button = 0;
+	CURRENT_STATE = 2;
 	clear();
 	move(3,0);
 	addstr("Recipes on file:");
@@ -121,29 +188,8 @@ void view_recipes(int pagenum)
 		}
 		refresh();
 
-		//printf("\t1) Print the number 3\n");
-		//printf("\t2) Print the number 4\n");
-		//printf("\t3) Print the number 5\n");
-		//printf("\t4) Go back to main menu.\n\n");
 
-		int input = 0;
-		while (input < '0' || input > '9')
-		{
-			input = getchar();
-		}
-
-
-		switch(input){
-			case '1' : printf("3\n"); break;
-			case '2' : printf("4\n"); break;
-			case '3' : printf("5\n"); break;
-			case '4' :
-			case '5' :
-			case '6' :
-			case '7' :
-			case '9' : view_recipes(pagenum + 1); break;
-			case '0' : main_menu(); break;
-		}
+		
 	}
 }
 
@@ -201,6 +247,57 @@ void load_recipes(char dirname[])
 
 		closedir(dir_ptr);
 	}
+}
+
+void print_recipe(char filename[])
+{
+	int in_fd, out_fd, n_chars;
+	char buf[BUFFERSIZE];
+	char cat[BUFFERSIZE];
+	cat[0] = '\0';
+	buf[0] = '\0';
+
+	char file_path[1024];
+	sprintf(file_path, "./recipes/%s", filename);
+
+	if ((in_fd = open(file_path, O_RDONLY)) == -1)
+	{
+		perror("Cannot open source file");
+		return;
+	}
+
+	while ((n_chars = read(in_fd, buf, BUFFERSIZE)) > 0)
+	{
+		strcat(cat, buf);
+	}
+
+	if (n_chars == -1)
+	{
+		perror("Read error");
+		return;
+	}
+
+	if (close(in_fd) == -1)
+	{
+		perror("Error closing file");
+		return;
+	}
+
+	addstr(cat);
+	refresh();
+	//printf("%s\n", cat);
+}
+
+int readButton (int pin)
+{
+	return digitalRead(pin);
+}
+
+void setupButton(int pin)
+{
+	wiringPiSetup();
+	pinMode (pin,INPUT);
+	pullUpDnControl(pin,PUD_UP);
 }
 
 void getUID(unsigned char *uid)
