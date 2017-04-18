@@ -205,9 +205,6 @@ void open_recipe(char filename[])
 	char cat[BUFFERSIZE];
 	cat[0] = '\0';
 
-	struct winsize w;
-	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-
 	char file_path[1024];
 	sprintf(file_path, "./recipes/%s", filename);
 
@@ -250,7 +247,13 @@ void print_recipe_page(char text[])
 		}
 	}
 
+	char part[BUFFERSIZE];
+	char nextext[BUFFERSIZE];
+
 	// Lines per page logic (4 spaces for options)
+	struct winsize w;
+	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+
 	int rows = w.ws_row - 4;
 
 	if (lines < rows)
@@ -275,11 +278,11 @@ void print_recipe_page(char text[])
 
 		int upto = i + 1;
 
-		char part[BUFFERSIZE];
+		part = "";
 		strncpy(part, text, upto);
 		part[upto] = '\0';
 
-		char nextext[BUFFERSIZE];
+		nextext = "";
 		strncpy(nextext, text+upto, (strlen(text) - upto));
 
 		clear(); 
@@ -300,7 +303,7 @@ void print_recipe_page(char text[])
 
 	// Only two options because of use in nfccard recipe viewing and recipe list viewing
 	switch(input){
-		case '1' : print_recipe_page(newtext); break;
+		case '1' : print_recipe_page(nexttext); break;
 		case '0' : main_menu(); break;
 	}
 
