@@ -283,7 +283,7 @@ void print_recipe_page(char text[])
 		part[upto] = '\0';
 
 		
-		strncpy(nextext, text+upto, (strlen(text) - upto));
+		strncpy(nexttext, text+upto, (strlen(text) - upto));
 
 		clear(); 
 		move(0,0);
