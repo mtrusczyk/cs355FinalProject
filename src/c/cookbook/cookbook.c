@@ -13,6 +13,7 @@
 #include	<curses.h>
 #include	<stdlib.h>
 #include	<nfc/nfc.h>
+#include	<sys/ioctl.h>
 
 #define BUFFERSIZE 4096
 
@@ -23,7 +24,8 @@ int NUM_OF_RECIPES;
 void main_menu();
 void load_recipes(char[]);
 void view_recipes(int);
-void print_recipe(char[]);
+void open_recipe(char[]);
+void print_recipe_page(char[]);
 void getUID(unsigned char[]);
 
 void get_hex(uint8_t *pbtData, size_t szBytes, unsigned char *uid)
@@ -123,11 +125,6 @@ void view_recipes(int pagenum)
 		}
 		refresh();
 
-		//printf("\t1) Print the number 3\n");
-		//printf("\t2) Print the number 4\n");
-		//printf("\t3) Print the number 5\n");
-		//printf("\t4) Go back to main menu.\n\n");
-
 		int input = 0;
 		while (input < '0' || input > '9')
 		{
@@ -136,8 +133,8 @@ void view_recipes(int pagenum)
 
 
 		switch(input){
-			case '1' : printf("3\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
-			case '2' : printf("4\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
+			case '1' : printf("3\n"); open_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
+			case '2' : printf("4\n"); open_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
 			case '3' : printf("5\n"); break;
 			case '9' : view_recipes(pagenum + 1); break;
 			case '0' : main_menu(); break;
@@ -201,11 +198,15 @@ void load_recipes(char dirname[])
 	}
 }
 
-void print_recipe(char filename[])
+void open_recipe(char filename[])
 {
 	int in_fd, out_fd, n_chars;
 	char buf[BUFFERSIZE];
 	char cat[BUFFERSIZE];
+	cat[0] = '\0';
+
+	struct winsize w;
+	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
 
 	char file_path[1024];
 	sprintf(file_path, "./recipes/%s", filename);
@@ -233,9 +234,75 @@ void print_recipe(char filename[])
 		return;
 	}
 
-	addstr(cat);
-	refresh();
-	//printf("%s\n", cat);
+	print_recipe_page(cat);
+}
+
+void print_recipe_page(char text[])
+{
+	// Counting Lines
+	int i;
+	int lines = 1;
+	for (i = 0; i < strlen(text); i = i + 1)
+	{
+		if(text[i] == '\n')
+		{
+			lines = lines + 1;
+		}
+	}
+
+	// Lines per page logic (4 spaces for options)
+	int rows = w.ws_row - 4;
+
+	if (lines < rows)
+	{
+		clear(); 
+		move(0,0);
+		addstr(cat);
+		move((rows - 1), 0);
+		addstr("0) Back to Main Menu");
+		refresh();
+	}
+	else {
+
+		for (i = 0; j < rows; i = i + 1)
+		{
+			if (text[i] == '\n')
+			{
+				j = j + 1;
+			}
+		}
+
+		int upto = i + 1;
+
+		char part[BUFFERSIZE];
+		strncpy(part, text, upto);
+		part[upto] = '\0';
+
+		char nextext[BUFFERSIZE];
+		strncpy(nextext, text+upto, (strlen(text) - upto));
+
+		clear(); 
+		move(0,0);
+		addstr(part);
+		move((rows - 2), 0);
+		addstr("1) Next Page");
+		move((rows - 1), 0);
+		addstr("0) Main Menu");
+		refresh();	
+	}
+
+	int input = 0;
+	while (input < '0' || input > '1')
+	{
+		input = getchar();
+	}
+
+	// Only two options because of use in nfccard recipe viewing and recipe list viewing
+	switch(input){
+		case '1' : //Next Page
+		case '0' : //Back to main menu
+	}
+
 }
 
 void getUID(unsigned char *uid)
