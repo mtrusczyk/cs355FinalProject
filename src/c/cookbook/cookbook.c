@@ -248,7 +248,7 @@ void print_recipe_page(char text[])
 	}
 
 	char part[BUFFERSIZE];
-	char nextext[BUFFERSIZE];
+	char nexttext[BUFFERSIZE];
 
 	// Lines per page logic (4 spaces for options)
 	struct winsize w;
@@ -278,11 +278,11 @@ void print_recipe_page(char text[])
 
 		int upto = i + 1;
 
-		part = "";
+		
 		strncpy(part, text, upto);
 		part[upto] = '\0';
 
-		nextext = "";
+		
 		strncpy(nextext, text+upto, (strlen(text) - upto));
 
 		clear(); 
