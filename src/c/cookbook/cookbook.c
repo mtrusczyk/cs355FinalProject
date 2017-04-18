@@ -14,6 +14,7 @@
 #include	<stdlib.h>
 #include	<nfc/nfc.h>
 #include	<sys/ioctl.h>
+#include	<unistd.h>
 
 #define BUFFERSIZE 4096
 
@@ -126,7 +127,7 @@ void view_recipes(int pagenum)
 		refresh();
 
 		int input = 0;
-		while (input < '0' || input > '9')
+		while (input != '0' || input != '1'|| input != '2' || input != '9')
 		{
 			input = getchar();
 		}
@@ -135,7 +136,6 @@ void view_recipes(int pagenum)
 		switch(input){
 			case '1' : printf("3\n"); open_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
 			case '2' : printf("4\n"); open_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
-			case '3' : printf("5\n"); break;
 			case '9' : view_recipes(pagenum + 1); break;
 			case '0' : main_menu(); break;
 		}
@@ -257,13 +257,14 @@ void print_recipe_page(char text[])
 	{
 		clear(); 
 		move(0,0);
-		addstr(cat);
+		addstr(text);
 		move((rows - 1), 0);
 		addstr("0) Back to Main Menu");
 		refresh();
 	}
 	else {
 
+		int j = 0;
 		for (i = 0; j < rows; i = i + 1)
 		{
 			if (text[i] == '\n')
@@ -299,8 +300,8 @@ void print_recipe_page(char text[])
 
 	// Only two options because of use in nfccard recipe viewing and recipe list viewing
 	switch(input){
-		case '1' : //Next Page
-		case '0' : //Back to main menu
+		case '1' : print_recipe_page(newtext); break;
+		case '0' : main_menu(); break;
 	}
 
 }
