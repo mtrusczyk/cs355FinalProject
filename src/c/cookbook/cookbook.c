@@ -21,6 +21,7 @@
 int CURRENT_STATE;
 char *RECIPES_LIST[30];
 int NUM_OF_RECIPES;
+WINDOW * mainwin;
 
 void main_menu();
 void load_recipes(char[]);
@@ -40,8 +41,6 @@ int main()
 
 	tty_mode(0);
 	set_cr_noecho_mode();
-
-	WINDOW * mainwin;
 
 
     /*  Initialize ncurses  */
@@ -63,9 +62,11 @@ void main_menu()
 	move(2,4);
 	addstr("1) Scan card");
 	move(3,4);
-	addstr("2) Assign new card\n");
+	addstr("2) Assign new card");
 	move(4,4);
-	addstr("3) View recipes\n\n");
+	addstr("3) View recipes");
+	move(5,4);
+	addstr("0) Exit");
 	refresh();
 
 	int input = 0;
@@ -80,7 +81,10 @@ void main_menu()
 		case '1' : getUID(uid); printf("%s\n",uid); break;
 		case '2' : printf("2\n"); break;
 		case '3' : load_recipes("./recipes");view_recipes(0); break;
+		case '0' : system("clear"); return;
 	}
+
+	return;
 }
 
 void view_recipes(int pagenum)
@@ -114,7 +118,7 @@ void view_recipes(int pagenum)
 			addstr(message);
 		}
 
-		if (NUM_OF_RECIPES > (3 * (pagenum + 1)))
+		if (NUM_OF_RECIPES > (2 * (pagenum + 1)))
 		{
 			move(5+i,4);
 			addstr("9) Next Page\n");
@@ -127,16 +131,16 @@ void view_recipes(int pagenum)
 		refresh();
 
 		int input = 0;
-		while (input != '0' || input != '1'|| input != '2' || input != '9')
+		while (input < '0' || input > '3')
 		{
 			input = getchar();
 		}
 
 
 		switch(input){
-			case '1' : printf("3\n"); open_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
-			case '2' : printf("4\n"); open_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
-			case '9' : view_recipes(pagenum + 1); break;
+			case '1' : open_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
+			case '2' : open_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
+			case '3' : view_recipes(pagenum + 1); break;
 			case '0' : main_menu(); break;
 		}
 	}
@@ -236,7 +240,7 @@ void open_recipe(char filename[])
 
 void print_recipe_page(char text[])
 {
-	// Counting Lines
+		// Counting Lines
 	int i;
 	int lines = 1;
 	for (i = 0; i < strlen(text); i = i + 1)
@@ -283,14 +287,14 @@ void print_recipe_page(char text[])
 		part[upto] = '\0';
 
 		
-		strncpy(nexttext, text+upto, (strlen(text) - upto));
+		strncpy(nexttext, text + upto, (strlen(text) - upto+1));
 
 		clear(); 
 		move(0,0);
 		addstr(part);
-		move((rows - 2), 0);
+		move((w.ws_row - 2), 0);
 		addstr("1) Next Page");
-		move((rows - 1), 0);
+		move((w.ws_row - 1), 0);
 		addstr("0) Main Menu");
 		refresh();	
 	}
