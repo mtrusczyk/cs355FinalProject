@@ -4,6 +4,7 @@
  */
 
 #include	<stdio.h>
+#include	<unistd.h>
 #include	<string.h>
 #include	<signal.h>
 #include	<termios.h>
@@ -22,11 +23,20 @@
 #define BUTTON3 2
 #define BUTTON4 3
 
+struct csv{
+	char UID[9];
+	char file[540];
+};
+
 int CURRENT_STATE;
 char *RECIPES_LIST[30];
 int NUM_OF_RECIPES;
-int button = 0;
+int button = 0, cont = 1;
 int pagenum;
+int NUM_OF_CSV = 0;
+
+struct csv uids[50];
+
 
 void main_menu();
 void load_recipes(char[]);
@@ -36,11 +46,41 @@ void getUID(unsigned char[]);
 int  readButton(int pin);
 void setupButton(int pin);
 void waitForInput();
+void readCsv(char[]);
+int nextUID(char[]);
+void writeCSV(char[]);
+void writeUID(char [], char []);
+int findUID(char[]);
+
+
 
 void get_hex(uint8_t *pbtData, size_t szBytes, unsigned char *uid)
 {
   sprintf(uid, "%02x%02x%02x%02x",pbtData[0],pbtData[1],pbtData[2],pbtData[3]);
 }
+
+ void writeUID(char *uid, char *fil)
+ {
+  	int i;
+	printf("%s",fil);
+  	if ((i = findUID(uid)) == -1)
+  	{
+  		strcpy(uids[NUM_OF_CSV].UID,uid);
+  		strcpy(uids[NUM_OF_CSV++].file,fil);
+  		strcat(uids[i].file,"\0");
+  	}
+  	else
+  	{
+  		strcpy(uids[i].UID,uid);
+  		strcpy(uids[i].file,fil);
+  		strcat(uids[i].file,"\0");
+
+  	}
+		printf("%s\n",uids[NUM_OF_CSV-1].file);
+		printf("%d",i);
+		delay(5000);
+}
+
 
 int main()
 {
@@ -66,22 +106,33 @@ int main()
 	exit(1);
     }
 
-	main_menu();
-	waitForInput();
+    readCsv("./file.csv");
+    main_menu();
+    waitForInput();
+    writeCSV("./file.csv");
+    endwin();
+}
+
+void getRecipe(int i, char *j)
+{
+	strcpy(j,RECIPES_LIST[i]);
 }
 
 void decodeState()
 {
       	if (CURRENT_STATE == 1)
       	{
+		char uid[12];
+		int i;
         	switch(button){
-          		case 1: printf("1\n");button = 0; break;
-          		case 2: printf("2\n"); break;
-          		case 3: load_recipes("./recipes");view_recipes(0); break;
+          		case 1:clear(); move(0,0); button = 0;getUID(uid);print_recipe(uids[findUID(uid)].file);  break;
+          		case 2: load_recipes("./recipes");view_recipes(0);button = 0;CURRENT_STATE = 4; break;
+          		case 3: load_recipes("./recipes");view_recipes(0);button = 0; break;
+			case 4: cont = 0;
         	}
       	}
 
-      	if (CURRENT_STATE == 2)
+      	else if (CURRENT_STATE == 2)
       	{
       		switch(button){
 				case 1:button = 0; printf("3\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
@@ -90,21 +141,33 @@ void decodeState()
 				case 4:button = 0; view_recipes(pagenum++); break;
 			}
       	}
-      	if (CURRENT_STATE == 3)
+      	else if (CURRENT_STATE == 3)
       	{
-		switch(button){
-		      		case '1' : printf("3\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
-				case '2' : printf("4\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
-				case '3' : printf("5\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[2 + 3 * pagenum]); break;
-				case '4' : main_menu(); break;
-		}
+			switch(button){
+		      		case 1 : printf("3\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
+				case 2 : printf("4\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
+				case 3 : printf("5\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[2 + 3 * pagenum]); break;
+				case 4 : main_menu(); break;
+			}
+      	}
+
+      	else if (CURRENT_STATE == 4)
+      	{
+		printf("%d",button);
+      		char uid[12], recipe[512];
+			switch(button){
+				case 1 : clear(); move(0,0);getRecipe(0+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
+				case 2 : clear(); move(0,0);getRecipe(1+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
+				case 3 : clear(); move(0,0);getRecipe(2+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
+				case 4 : button = 0; main_menu(); break;
+			}
       	}
 	delay(250);
 }
 
 void waitForInput()
 {
-  for(;;)
+  while (cont)
   {
     if (button)
       decodeState();
@@ -143,8 +206,9 @@ void main_menu()
 
 }
 
-void view_recipes(int pagenum)
+void view_recipes(int page)
 {
+	pagenum = page;
 	button = 0;
 	CURRENT_STATE = 2;
 	clear();
@@ -159,12 +223,6 @@ void view_recipes(int pagenum)
 		addstr("0) Back to Main Menu");
 		refresh();
 
-		int input = 0;
-		while (input != 48)
-		{
-			input = getchar();
-		}
-		main_menu();
 	}
 	else {
 		int i;
@@ -183,6 +241,7 @@ void view_recipes(int pagenum)
 		}
 		else
 		{
+			CURRENT_STATE = 3;
 			move(5+i,4);
 			addstr("0) Back to Main Menu\n\n");
 		}
@@ -299,6 +358,94 @@ void setupButton(int pin)
 	pinMode (pin,INPUT);
 	pullUpDnControl(pin,PUD_UP);
 }
+int findUID(char *uid)
+{
+	int i;
+	for (i = 0; i < NUM_OF_CSV; i ++)
+	{
+		if (!strcmp(uid,uids[i].UID))
+			return i;
+	}
+	return -1;
+}
+
+void writeCSV(char *file_path)
+{
+	char buffer[BUFFERSIZE];
+	buffer[0] = '\0';
+	int i, in_fd;
+	for(i = 0; i < NUM_OF_CSV; i++)
+	{
+		char line[540];
+		sprintf(line,"%s;%s;\n\0",uids[i].UID,uids[i].file);
+		strcat(buffer,line);
+	}
+	if ((in_fd = open(file_path, O_WRONLY)) == -1)
+	{
+		perror("Cannot open source file");
+	}
+
+	write(in_fd,buffer,strlen(buffer));
+printf("%s %d",buffer,strlen(buffer));
+
+	close(in_fd);
+
+}
+
+
+void readCsv(char  *file)
+{
+	char buf[BUFFERSIZE];
+	char cat[BUFFERSIZE];
+	int n_chars, in_fd;
+	cat[0] = '\0';
+	buf[0] = '\0';
+	char file_path[1024];
+	sprintf(file_path,"./%s",file);
+	if ((in_fd = open(file_path, O_RDONLY)) == -1)
+	{
+		perror("Cannot open source file");
+	}
+
+	while ((n_chars = read(in_fd, buf, BUFFERSIZE)) > 0)
+	{
+		strcat(cat, buf);
+	}
+
+	close(in_fd);
+
+	int i = 0, next;
+	int lastRecord = 0;
+	
+	while ((next = nextUID(&buf[lastRecord]))>0)
+	{
+		printf("%d\n",next);
+		if(next > 0)	
+		{
+			strncat(uids[i].UID,&buf[lastRecord],8);
+			uids[i].UID[8] = '\0';
+			strncpy(uids[i].file,&buf[lastRecord+9],next-9);
+			strcat(uids[i].file, "\0");
+			NUM_OF_CSV++;
+		}
+		i++;
+		lastRecord+=(next+2);
+	}
+}
+
+int nextUID(char *buffer)
+{
+	int i, flag = 1;
+	
+	for (i = 0; i < strlen(buffer); i++)
+	{
+		if (flag && buffer[i] == ';')
+			flag = 0;
+		else if (!flag && buffer[i] ==';')
+			return i;
+	}
+	return -1;
+}
 
 void getUID(unsigned char *uid)
 {
@@ -314,6 +461,7 @@ void getUID(unsigned char *uid)
     printf("Unable to init libnfc (malloc)\n");
     exit(EXIT_FAILURE);
   }
+
 
   // Display libnfc version
   const char *acLibnfcVersion = nfc_version();
