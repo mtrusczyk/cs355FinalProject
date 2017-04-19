@@ -16,8 +16,9 @@
 #include	<nfc/nfc.h>
 #include 	<wiringPi.h>
 #include	<errno.h>
+#include	<sys/ioctl.h>
 
-#define BUFFERSIZE 4096
+#define BUFFERSIZE 10240
 #define BUTTON1 0
 #define BUTTON2 1
 #define BUTTON3 2
@@ -31,6 +32,7 @@ struct csv{
 int CURRENT_STATE;
 char *RECIPES_LIST[30];
 int NUM_OF_RECIPES;
+char nexttext[BUFFERSIZE];
 
 int button = 0, cont = 1;
 int pagenum;
@@ -65,7 +67,6 @@ void get_hex(uint8_t *pbtData, size_t szBytes, unsigned char *uid)
 void writeUID(char *uid, char *fil)
 {
   	int i;
-	printf("%s",fil);
   	if ((i = findUID(uid)) == -1)
   	{
   		strcpy(uids[NUM_OF_CSV].UID,uid);
@@ -79,9 +80,6 @@ void writeUID(char *uid, char *fil)
   		strcat(uids[i].file,"\0");
 
   	}
-		printf("%s\n",uids[NUM_OF_CSV-1].file);
-		printf("%d",i);
-		delay(5000);
 }
 
 int main()
@@ -125,7 +123,7 @@ void decodeState()
 		char uid[12];
 		int i;
         	switch(button){
-          		case 1:clear(); move(0,0); button = 0;getUID(uid);print_recipe(uids[findUID(uid)].file);  break;
+          		case 1:clear(); move(0,0); button = 0;getUID(uid);open_recipe(uids[findUID(uid)].file);  break;
           		case 2: load_recipes("./recipes");view_recipes(0);button = 0;CURRENT_STATE = 4; break;
           		case 3: load_recipes("./recipes");view_recipes(0);button = 0; break;
 			case 4: cont = 0;
@@ -135,25 +133,24 @@ void decodeState()
       	else if (CURRENT_STATE == 2)
       	{
       		switch(button){
-				case 1:button = 0; printf("3\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
-				case 2:button = 0; printf("4\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
-				case 3:button = 0; printf("5\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[2 + 3 * pagenum]); break;
-				case 4:button = 0; view_recipes(pagenum++); break;
+				case 1:button = 0; printf("3\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
+				case 2:button = 0; printf("4\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
+				case 3:button = 0; printf("5\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[2 + 3 * pagenum]); break;
+				case 4:button = 0; view_recipes(++pagenum); break;
 			}
       	}
       	else if (CURRENT_STATE == 3)
       	{
 			switch(button){
-		      		case 1 : printf("3\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
-				case 2 : printf("4\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
-				case 3 : printf("5\n"); clear(); move(0,0); print_recipe(RECIPES_LIST[2 + 3 * pagenum]); break;
+		      		case 1 : printf("3\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
+				case 2 : printf("4\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
+				case 3 : printf("5\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[2 + 3 * pagenum]); break;
 				case 4 : main_menu(); break;
 			}
       	}
 
       	else if (CURRENT_STATE == 4)
       	{
-		printf("%d",button);
       		char uid[12], recipe[512];
 			switch(button){
 				case 1 : clear(); move(0,0);getRecipe(0+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
@@ -161,8 +158,18 @@ void decodeState()
 				case 3 : clear(); move(0,0);getRecipe(2+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
 				case 4 : button = 0; main_menu(); break;
 			}
+	}
+      	else if (CURRENT_STATE == 5)
+      	{
+			switch(button){
+				case 1 : button = 0;print_recipe_page(nexttext);break;
+				case 4 : main_menu(); break;
+				default: button = 0; break;
+
+
+			}
       	}
-	delay(250);
+	delay(200);
 }
 
 void waitForInput()
@@ -213,14 +220,14 @@ void view_recipes(int page)
 	button = 0;
 	CURRENT_STATE = 2;
 	clear();
-	move(3,0);
+	move(0,0);
 	addstr("Recipes on file:");
 
 	if (NUM_OF_RECIPES < 1 || NUM_OF_RECIPES == (int)NULL)
 	{
-		move(5,0);
+		move(3,0);
 		addstr("No recipes found...");
-		move(7,4);
+		move(5,4);
 		addstr("0) Back to Main Menu");
 		refresh();
 
@@ -230,20 +237,20 @@ void view_recipes(int page)
 		char message[1024];
 		for (i = 0; (i + 3*pagenum) < NUM_OF_RECIPES && i < 3; i = i + 1)
 		{
-			move(5+i,4);
+			move(2+i,4);
 			sprintf(message,"%d) %s\n", (i + 1), RECIPES_LIST[i + 3 * pagenum]);
 			addstr(message);
 		}
 
-		if (NUM_OF_RECIPES > (2 * (pagenum + 1)))
+		if (NUM_OF_RECIPES > (3 * (pagenum + 1)))
 		{
-			move(5+i,4);
+			move(2+i,4);
 			addstr("9) Next Page\n");
 		}
 		else
 		{
 			CURRENT_STATE = 3;
-			move(5+i,4);
+			move(2+i,4);
 			addstr("0) Back to Main Menu\n\n");
 		}
 		refresh();
@@ -309,6 +316,7 @@ void load_recipes(char dirname[])
 
 void open_recipe(char filename[])
 {
+	CURRENT_STATE = 5;
 	int in_fd, out_fd, n_chars;
 	char buf[BUFFERSIZE];
 	char cat[BUFFERSIZE];
@@ -325,8 +333,9 @@ void open_recipe(char filename[])
 
 	while ((n_chars = read(in_fd, buf, BUFFERSIZE)) > 0)
 	{
-		strcat(cat, buf);
+		strncat(cat, buf,n_chars);
 	}
+	strcat(cat,"\0");
 
 	if (n_chars == -1)
 	{
@@ -357,7 +366,6 @@ void print_recipe_page(char text[])
 	}
 
 	char part[BUFFERSIZE];
-	char nexttext[BUFFERSIZE];
 
 	// Lines per page logic (4 spaces for options)
 	struct winsize w;
@@ -367,7 +375,7 @@ void print_recipe_page(char text[])
 
 	if (lines < rows)
 	{
-		clear(); 
+		clear();
 		move(0,0);
 		addstr(text);
 		move((rows - 1), 0);
@@ -387,35 +395,24 @@ void print_recipe_page(char text[])
 
 		int upto = i + 1;
 
-		
+
 		strncpy(part, text, upto);
 		part[upto] = '\0';
 
-		
+
 		strncpy(nexttext, text + upto, (strlen(text) - upto+1));
 
-		clear(); 
+		clear();
 		move(0,0);
 		addstr(part);
 		move((w.ws_row - 2), 0);
 		addstr("1) Next Page");
 		move((w.ws_row - 1), 0);
 		addstr("0) Main Menu");
-		refresh();	
+		refresh();
 	}
 
-	int input = 0;
-	while (input < '0' || input > '1')
-	{
-		input = getchar();
-	}
-
-	// Only two options because of use in nfccard recipe viewing and recipe list viewing
-	switch(input){
-		case '1' : print_recipe_page(nexttext); break;
-		case '0' : main_menu(); break;
-	}
-  
+}
   int readButton (int pin)
 {
 	return digitalRead(pin);
@@ -455,8 +452,6 @@ void writeCSV(char *file_path)
 	}
 
 	write(in_fd,buffer,strlen(buffer));
-printf("%s %d",buffer,strlen(buffer));
-
 	close(in_fd);
 
 }
@@ -485,11 +480,10 @@ void readCsv(char  *file)
 
 	int i = 0, next;
 	int lastRecord = 0;
-	
+
 	while ((next = nextUID(&buf[lastRecord]))>0)
 	{
-		printf("%d\n",next);
-		if(next > 0)	
+		if(next > 0)
 		{
 			strncat(uids[i].UID,&buf[lastRecord],8);
 			uids[i].UID[8] = '\0';
@@ -505,7 +499,7 @@ void readCsv(char  *file)
 int nextUID(char *buffer)
 {
 	int i, flag = 1;
-	
+
 	for (i = 0; i < strlen(buffer); i++)
 	{
 		if (flag && buffer[i] == ';')
