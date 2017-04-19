@@ -31,17 +31,20 @@ struct csv{
 int CURRENT_STATE;
 char *RECIPES_LIST[30];
 int NUM_OF_RECIPES;
+
 int button = 0, cont = 1;
 int pagenum;
 int NUM_OF_CSV = 0;
 
 struct csv uids[50];
 
+WINDOW * mainwin;
 
 void main_menu();
 void load_recipes(char[]);
 void view_recipes(int);
-void print_recipe(char[]);
+void open_recipe(char[]);
+void print_recipe_page(char[]);
 void getUID(unsigned char[]);
 int  readButton(int pin);
 void setupButton(int pin);
@@ -59,8 +62,8 @@ void get_hex(uint8_t *pbtData, size_t szBytes, unsigned char *uid)
   sprintf(uid, "%02x%02x%02x%02x",pbtData[0],pbtData[1],pbtData[2],pbtData[3]);
 }
 
- void writeUID(char *uid, char *fil)
- {
+void writeUID(char *uid, char *fil)
+{
   	int i;
 	printf("%s",fil);
   	if ((i = findUID(uid)) == -1)
@@ -81,7 +84,6 @@ void get_hex(uint8_t *pbtData, size_t szBytes, unsigned char *uid)
 		delay(5000);
 }
 
-
 int main()
 {
 	CURRENT_STATE = 0;
@@ -95,8 +97,6 @@ int main()
   	setupButton(BUTTON2);
   	setupButton(BUTTON3);
   	setupButton(BUTTON4);
-
-	WINDOW * mainwin;
 
 
     /*  Initialize ncurses  */
@@ -199,11 +199,12 @@ void main_menu()
 	move(2,4);
 	addstr("1) Scan card");
 	move(3,4);
-	addstr("2) Assign new card\n");
+	addstr("2) Assign new card");
 	move(4,4);
-	addstr("3) View recipes\n\n");
+	addstr("3) View recipes");
+	move(5,4);
+	addstr("0) Exit");
 	refresh();
-
 }
 
 void view_recipes(int page)
@@ -234,7 +235,7 @@ void view_recipes(int page)
 			addstr(message);
 		}
 
-		if (NUM_OF_RECIPES > (3 * (pagenum + 1)))
+		if (NUM_OF_RECIPES > (2 * (pagenum + 1)))
 		{
 			move(5+i,4);
 			addstr("9) Next Page\n");
@@ -246,9 +247,6 @@ void view_recipes(int page)
 			addstr("0) Back to Main Menu\n\n");
 		}
 		refresh();
-
-
-		
 	}
 }
 
@@ -308,13 +306,13 @@ void load_recipes(char dirname[])
 	}
 }
 
-void print_recipe(char filename[])
+
+void open_recipe(char filename[])
 {
 	int in_fd, out_fd, n_chars;
 	char buf[BUFFERSIZE];
 	char cat[BUFFERSIZE];
 	cat[0] = '\0';
-	buf[0] = '\0';
 
 	char file_path[1024];
 	sprintf(file_path, "./recipes/%s", filename);
@@ -342,12 +340,83 @@ void print_recipe(char filename[])
 		return;
 	}
 
-	addstr(cat);
-	refresh();
-	//printf("%s\n", cat);
+	print_recipe_page(cat);
 }
 
-int readButton (int pin)
+void print_recipe_page(char text[])
+{
+		// Counting Lines
+	int i;
+	int lines = 1;
+	for (i = 0; i < strlen(text); i = i + 1)
+	{
+		if(text[i] == '\n')
+		{
+			lines = lines + 1;
+		}
+	}
+
+	char part[BUFFERSIZE];
+	char nexttext[BUFFERSIZE];
+
+	// Lines per page logic (4 spaces for options)
+	struct winsize w;
+	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+
+	int rows = w.ws_row - 4;
+
+	if (lines < rows)
+	{
+		clear(); 
+		move(0,0);
+		addstr(text);
+		move((rows - 1), 0);
+		addstr("0) Back to Main Menu");
+		refresh();
+	}
+	else {
+
+		int j = 0;
+		for (i = 0; j < rows; i = i + 1)
+		{
+			if (text[i] == '\n')
+			{
+				j = j + 1;
+			}
+		}
+
+		int upto = i + 1;
+
+		
+		strncpy(part, text, upto);
+		part[upto] = '\0';
+
+		
+		strncpy(nexttext, text + upto, (strlen(text) - upto+1));
+
+		clear(); 
+		move(0,0);
+		addstr(part);
+		move((w.ws_row - 2), 0);
+		addstr("1) Next Page");
+		move((w.ws_row - 1), 0);
+		addstr("0) Main Menu");
+		refresh();	
+	}
+
+	int input = 0;
+	while (input < '0' || input > '1')
+	{
+		input = getchar();
+	}
+
+	// Only two options because of use in nfccard recipe viewing and recipe list viewing
+	switch(input){
+		case '1' : print_recipe_page(nexttext); break;
+		case '0' : main_menu(); break;
+	}
+  
+  int readButton (int pin)
 {
 	return digitalRead(pin);
 }
@@ -446,6 +515,7 @@ int nextUID(char *buffer)
 	}
 	return -1;
 }
+
 
 void getUID(unsigned char *uid)
 {
