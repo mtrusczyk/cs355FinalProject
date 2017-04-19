@@ -125,7 +125,7 @@ void decodeState()
         	switch(button){
           		case 1:clear(); move(0,0); button = 0;getUID(uid);open_recipe(uids[findUID(uid)].file);  break;
           		case 2: load_recipes("./recipes");view_recipes(0);button = 0;CURRENT_STATE = 4; break;
-          		case 3: load_recipes("./recipes");view_recipes(0);button = 0; break;
+          		case 3: load_recipes("./recipes");view_recipes(0);button = 0;CURRENT_STATE = 2; break;
 			case 4: cont = 0;
         	}
       	}
@@ -156,7 +156,7 @@ void decodeState()
 				case 1 : clear(); move(0,0);getRecipe(0+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
 				case 2 : clear(); move(0,0);getRecipe(1+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
 				case 3 : clear(); move(0,0);getRecipe(2+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
-				case 4 : button = 0; main_menu(); break;
+				case 4:button = 0; view_recipes(++pagenum); break;
 			}
 	}
       	else if (CURRENT_STATE == 5)
@@ -169,6 +169,17 @@ void decodeState()
 
 			}
       	}
+      	else if (CURRENT_STATE == 6)
+      	{
+      		char uid[12], recipe[512];
+			switch(button){
+				case 1 : clear(); move(0,0);getRecipe(0+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
+				case 2 : clear(); move(0,0);getRecipe(1+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
+				case 3 : clear(); move(0,0);getRecipe(2+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
+				case 4 : button = 0; main_menu();  break;
+			}
+	}
+
 	delay(200);
 }
 
@@ -218,7 +229,6 @@ void view_recipes(int page)
 {
 	pagenum = page;
 	button = 0;
-	CURRENT_STATE = 2;
 	clear();
 	move(0,0);
 	addstr("Recipes on file:");
@@ -245,11 +255,15 @@ void view_recipes(int page)
 		if (NUM_OF_RECIPES > (3 * (pagenum + 1)))
 		{
 			move(2+i,4);
-			addstr("9) Next Page\n");
+			addstr("0) Next Page\n");
 		}
 		else
 		{
-			CURRENT_STATE = 3;
+			if (CURRENT_STATE == 2)
+				CURRENT_STATE = 3;
+			else
+				CURRENT_STATE = 6;
+
 			move(2+i,4);
 			addstr("0) Back to Main Menu\n\n");
 		}
@@ -354,22 +368,31 @@ void open_recipe(char filename[])
 
 void print_recipe_page(char text[])
 {
+	button = 0;
+	struct winsize w;
+	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+
 		// Counting Lines
-	int i;
+	int i, j = 0;
 	int lines = 1;
 	for (i = 0; i < strlen(text); i = i + 1)
 	{
+		if (++j == w.ws_col-1)
+		{
+			lines++;
+			j = 0;
+		}
+
 		if(text[i] == '\n')
 		{
 			lines = lines + 1;
+			j = 0;
 		}
 	}
 
 	char part[BUFFERSIZE];
 
 	// Lines per page logic (4 spaces for options)
-	struct winsize w;
-	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
 
 	int rows = w.ws_row - 4;
 
@@ -384,23 +407,31 @@ void print_recipe_page(char text[])
 	}
 	else {
 
-		int j = 0;
+		int j = 0, k = 0;
 		for (i = 0; j < rows; i = i + 1)
 		{
+			if (++k == w.ws_col-1)
+			{
+				j++;
+				k = 0;
+				if(j>= rows)
+					break;
+			}
 			if (text[i] == '\n')
 			{
 				j = j + 1;
+				k = 0;
 			}
 		}
 
-		int upto = i + 1;
+		int upto = i ;
 
 
 		strncpy(part, text, upto);
 		part[upto] = '\0';
 
 
-		strncpy(nexttext, text + upto, (strlen(text) - upto+1));
+		strcpy(nexttext, &text[upto]);
 
 		clear();
 		move(0,0);
