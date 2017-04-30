@@ -17,6 +17,7 @@
 #include 	<wiringPi.h>
 #include	<errno.h>
 #include	<sys/ioctl.h>
+#include	<curl/curl.h>
 
 #define BUFFERSIZE 10240
 #define BUTTON1 0
@@ -25,7 +26,7 @@
 #define BUTTON4 3
 
 struct csv{
-	char UID[9];
+	char UID[12];
 	char file[540];
 };
 
@@ -33,7 +34,9 @@ int CURRENT_STATE;
 char *RECIPES_LIST[30];
 int NUM_OF_RECIPES;
 char nexttext[BUFFERSIZE];
-
+char *userpasswd = "";
+char *server = "";
+char *user = "hadoop";
 int button = 0, cont = 1;
 int pagenum;
 int NUM_OF_CSV = 0;
@@ -52,12 +55,103 @@ int  readButton(int pin);
 void setupButton(int pin);
 void waitForInput();
 void readCsv(char[]);
-int nextUID(char[]);
+int  nextUID(char[]);
 void writeCSV(char[]);
 void writeUID(char [], char []);
-int findUID(char[]);
+int  findUID(char[]);
+
+int getCurl(char *recipe, char *file_n)
+{
+  CURLcode ret;
+  CURL *hnd;
+
+  FILE *file = fopen( file_n, "w");
+
+  char dir[1024];
+  sprintf(dir,"sftp://%s/~/recipes/%s",server,user,recipe);
+
+  hnd = curl_easy_init();
+  curl_easy_setopt(hnd, CURLOPT_URL, dir);
+  curl_easy_setopt(hnd, CURLOPT_USERPWD, userpasswd);
+  curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.38.0");
+  curl_easy_setopt(hnd, CURLOPT_WRITEDATA, file);
+  curl_easy_setopt(hnd, CURLOPT_MAXREDIRS, 50L);
+  curl_easy_setopt(hnd, CURLOPT_SSL_VERIFYPEER, 0L);
+  curl_easy_setopt(hnd, CURLOPT_SSL_VERIFYHOST, 0L);
+  curl_easy_setopt(hnd, CURLOPT_TCP_KEEPALIVE, 1L);
+  curl_easy_setopt(hnd, CURLOPT_HEADER, 0L);
+
+  ret = curl_easy_perform(hnd);
+
+  curl_easy_cleanup(hnd);
+  hnd = NULL;
+  fclose(file);
+  return (int)ret;
+}
+
+int putCurl(char *LOCAL_FILE, char *rname)
+{
+  CURL *curl;
+  char REMOTE_URL[1024];
+  CURLcode res;
+  FILE *hd_src;
+  struct stat file_info;
+  curl_off_t fsize;
+ 
+  sprintf(REMOTE_URL,"sftp://%s/~/recipes/%s",server,rname);
 
 
+  /* get the file size of the local file */ 
+  if(stat(LOCAL_FILE, &file_info)) {
+    printf("Couldnt open '%s': %s\n", LOCAL_FILE, strerror(errno));
+    return 1;
+  }
+  fsize = (curl_off_t)file_info.st_size;
+ 
+  /* get a FILE * of the same file */ 
+  hd_src = fopen(LOCAL_FILE, "rb");
+ 
+  /* In windows, this will init the winsock stuff */ 
+  curl_global_init(CURL_GLOBAL_ALL);
+ 
+  /* get a curl handle */ 
+  curl = curl_easy_init();
+  if(curl) {
+ 
+    curl_easy_setopt(curl, CURLOPT_USERPWD, userpasswd);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "curl/7.38.0");
+
+    /* enable uploading */ 
+	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+ 
+    /* specify target */ 
+    curl_easy_setopt(curl, CURLOPT_URL, REMOTE_URL);
+ 
+    /* now specify which file to upload */ 
+    curl_easy_setopt(curl, CURLOPT_READDATA, hd_src);
+ 
+    /* Set the size of the file to upload (optional).  If you give a *_LARGE
+       option you MUST make sure that the type of the passed-in argument is a
+       curl_off_t. If you use CURLOPT_INFILESIZE (without _LARGE) you must
+       make sure that to pass in a type 'long' argument. */ 
+    curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE,(curl_off_t)fsize);
+ 
+    /* Now run off and do what you've been told! */ 
+    res = curl_easy_perform(curl);
+    /* Check for errors */ 
+    if(res != CURLE_OK)
+      fprintf(stderr, "curl_easy_perform(%d) failed: %s\n",res,curl_easy_strerror(res));
+ 
+    /* clean up the FTP commands list */ 
+    /* always cleanup */ 
+    curl_easy_cleanup(curl);
+  }
+  fclose(hd_src); /* close the local file */ 
+ 
+  curl_global_cleanup();
+  return 0;
+
+}
 
 void get_hex(uint8_t *pbtData, size_t szBytes, unsigned char *uid)
 {
@@ -88,8 +182,8 @@ int main()
 
 	if (wiringPiSetup () < 0)
   	{
-    	fprintf (stderr, "Unable to setup wiringPi: %s\n", strerror (errno)) ;
-    	return 1 ;
+    		fprintf (stderr, "Unable to setup wiringPi: %s\n", strerror (errno)) ;
+    		return 1 ;
   	}
   	setupButton(BUTTON1);
   	setupButton(BUTTON2);
@@ -104,10 +198,14 @@ int main()
 	exit(1);
     }
 
+    getCurl("UIDList.csv","file.csv");
     readCsv("./file.csv");
+    chdir("./recipes");
     main_menu();
     waitForInput();
+    chdir("..");
     writeCSV("./file.csv");
+    putCurl("file.csv", "UIDList.csv");
     endwin();
 }
 
@@ -123,7 +221,7 @@ void decodeState()
 		char uid[12];
 		int i;
         	switch(button){
-          		case 1:clear(); move(0,0); button = 0;getUID(uid);open_recipe(uids[findUID(uid)].file);  break;
+          		case 1:clear(); move(0,0); button = 0;getUID(uid);getCurl(uids[findUID(uid)].file,"recipe.txt");open_recipe("recipe.txt");  break;
           		case 2: load_recipes("./recipes");view_recipes(0);button = 0;CURRENT_STATE = 4; break;
           		case 3: load_recipes("./recipes");view_recipes(0);button = 0;CURRENT_STATE = 2; break;
 			case 4: cont = 0;
@@ -191,16 +289,13 @@ void waitForInput()
       decodeState();
     else
     {
-      	if (!readButton(BUTTON1))
-        	button = 1;
-      	else if (!readButton(BUTTON2))
-        	button = 2;
-      	else if (!readButton(BUTTON3))
-        	button = 3;
-
-      	else if (!readButton(BUTTON4))
-        	button = 4;
-
+	int c = getchar();
+	switch (c){
+		case '1': button = 1; break;
+		case '2': button = 2; break;
+		case '3': button = 3; break;
+		case '0': button = 4; break;
+	}
     }
   }
 
@@ -337,7 +432,7 @@ void open_recipe(char filename[])
 	cat[0] = '\0';
 
 	char file_path[1024];
-	sprintf(file_path, "./recipes/%s", filename);
+	sprintf(file_path, "./%s", filename);
 
 	if ((in_fd = open(file_path, O_RDONLY)) == -1)
 	{
