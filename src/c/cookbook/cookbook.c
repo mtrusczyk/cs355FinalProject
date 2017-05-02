@@ -24,6 +24,9 @@
 #define BUTTON2 1
 #define BUTTON3 2
 #define BUTTON4 3
+#define USERPASSWD ""
+#define SERVER ""
+
 
 struct csv{
 	char UID[12];
@@ -31,12 +34,9 @@ struct csv{
 };
 
 int CURRENT_STATE;
-char *RECIPES_LIST[30];
-int NUM_OF_RECIPES;
+char RECIPES_LIST[30][100];
+int NUM_OF_RECIPES = 0;
 char nexttext[BUFFERSIZE];
-char *userpasswd = "";
-char *server = "";
-char *user = "hadoop";
 int button = 0, cont = 1;
 int pagenum;
 int NUM_OF_CSV = 0;
@@ -46,7 +46,7 @@ struct csv uids[50];
 WINDOW * mainwin;
 
 void main_menu();
-void load_recipes(char[]);
+void load_recipes();
 void view_recipes(int);
 void open_recipe(char[]);
 void print_recipe_page(char[]);
@@ -68,11 +68,11 @@ int getCurl(char *recipe, char *file_n)
   FILE *file = fopen( file_n, "w");
 
   char dir[1024];
-  sprintf(dir,"sftp://%s/~/recipes/%s",server,user,recipe);
+  sprintf(dir,"sftp://%s/~/recipes/%s",SERVER,recipe);
 
   hnd = curl_easy_init();
   curl_easy_setopt(hnd, CURLOPT_URL, dir);
-  curl_easy_setopt(hnd, CURLOPT_USERPWD, userpasswd);
+  curl_easy_setopt(hnd, CURLOPT_USERPWD, USERPASSWD);
   curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.38.0");
   curl_easy_setopt(hnd, CURLOPT_WRITEDATA, file);
   curl_easy_setopt(hnd, CURLOPT_MAXREDIRS, 50L);
@@ -98,7 +98,7 @@ int putCurl(char *LOCAL_FILE, char *rname)
   struct stat file_info;
   curl_off_t fsize;
  
-  sprintf(REMOTE_URL,"sftp://%s/~/recipes/%s",server,rname);
+  sprintf(REMOTE_URL,"sftp://%s/~/recipes/%s",SERVER,rname);
 
 
   /* get the file size of the local file */ 
@@ -118,7 +118,7 @@ int putCurl(char *LOCAL_FILE, char *rname)
   curl = curl_easy_init();
   if(curl) {
  
-    curl_easy_setopt(curl, CURLOPT_USERPWD, userpasswd);
+    curl_easy_setopt(curl, CURLOPT_USERPWD, USERPASSWD);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "curl/7.38.0");
 
     /* enable uploading */ 
@@ -198,6 +198,8 @@ int main()
 	exit(1);
     }
 
+    getCurl("recipeList.txt","recipeList.txt");
+    load_recipes();
     getCurl("UIDList.csv","file.csv");
     readCsv("./file.csv");
     chdir("./recipes");
@@ -222,8 +224,8 @@ void decodeState()
 		int i;
         	switch(button){
           		case 1:clear(); move(0,0); button = 0;getUID(uid);getCurl(uids[findUID(uid)].file,"recipe.txt");open_recipe("recipe.txt");  break;
-          		case 2: load_recipes("./recipes");view_recipes(0);button = 0;CURRENT_STATE = 4; break;
-          		case 3: load_recipes("./recipes");view_recipes(0);button = 0;CURRENT_STATE = 2; break;
+          		case 2: view_recipes(0);button = 0;CURRENT_STATE = 4; break;
+          		case 3: view_recipes(0);button = 0;CURRENT_STATE = 2; break;
 			case 4: cont = 0;
         	}
       	}
@@ -399,26 +401,29 @@ tty_mode(int how)
 	}
 }
 
-void load_recipes(char dirname[])
+void load_recipes()
 {
-	DIR		*dir_ptr;
-	struct dirent	*direntp;
-	if ( ( dir_ptr = opendir( dirname ) ) == NULL )
-		fprintf(stderr,"ls1: cannot open %s\n", dirname);
-	else
-	{
-		int i;
-		for (i = 0; ( direntp = readdir( dir_ptr ) ) != NULL; i = i + 1){
-			if (!strcmp(direntp->d_name,".") || !strcmp(direntp->d_name,".."))
-				{
-					i--;
-					continue;
-				}
-			RECIPES_LIST[i] = direntp->d_name;
-			NUM_OF_RECIPES = i + 1;
-		}
+	int in_fd;
+	char recipes[BUFFERSIZE];
 
-		closedir(dir_ptr);
+	if ((in_fd = open("recipeList.txt", O_RDONLY)) == -1)
+	{
+		perror("Cannot open source file");
+		return;
+	}
+	int n_chars = read(in_fd,recipes,BUFFERSIZE);
+	int i,j = 0;
+
+	for(i = 0; i < n_chars; i++)
+	{
+		if(recipes[i] == '\n')
+		{
+			strncpy(RECIPES_LIST[NUM_OF_RECIPES++],&recipes[i-j],j+1);
+			/*RECIPES_LIST[NUM_OF_RECIPES][j] = '\0';*/
+			j = 0;
+			i++;
+		}
+		j++;
 	}
 }
 
