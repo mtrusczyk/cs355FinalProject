@@ -26,6 +26,13 @@
 #define BUTTON4 3
 #define USERPASSWD ""
 #define SERVER ""
+#define WIDTH 58
+#define HEIGHT 49
+#define menuStart 45
+char *choices[] = {     "Scan Card",
+            "Assign New Card",
+            "Exit"
+          };
 
 
 struct csv{
@@ -40,10 +47,15 @@ char nexttext[BUFFERSIZE];
 int button = 0, cont = 1;
 int pagenum;
 int NUM_OF_CSV = 0;
+int startx = 0;
+int starty = 0;
+int displayedRecipes = 0;
 
 struct csv uids[50];
 
-WINDOW * mainwin;
+WINDOW *mainwin;
+MEVENT event;
+WINDOW *menu_win;
 
 void main_menu();
 void load_recipes();
@@ -59,6 +71,70 @@ int  nextUID(char[]);
 void writeCSV(char[]);
 void writeUID(char [], char []);
 int  findUID(char[]);
+
+void scanNFC()
+{
+	clear();
+	mvprintw(HEIGHT/2, (WIDTH-strlen("PLEASE SCAN CARD"))/2,"PLEASE SCAN CARD");
+	refresh();
+}
+
+void removeNFC()
+{
+	clear();
+	mvprintw(HEIGHT/2, (WIDTH-strlen("PLEASE REMOVE CARD"))/2,"PLEASE REMOVE CARD");
+	refresh();
+}
+
+void optionsWindow()
+{
+    int i;
+    for(i = 0; i<WIDTH; i++)
+    {
+	mvaddch(menuStart,i,'_');
+    }
+    mvaddch(menuStart+1,WIDTH/3,'|');
+    mvaddch(menuStart+2,WIDTH/3,'|');
+    mvaddch(menuStart+3,WIDTH/3,'|');
+    mvaddch(menuStart+1,2*WIDTH/3,'|');
+    mvaddch(menuStart+2,2*WIDTH/3,'|');
+    mvaddch(menuStart+3,2*WIDTH/3,'|');
+
+    mvprintw(menuStart+2,WIDTH/6-2,"Next");
+    mvprintw(menuStart+2,3*WIDTH/6-2,"Main");
+    mvprintw(menuStart+2,5*WIDTH/6-2,"Exit");
+}
+int getOptionWindow(int x)
+{
+    if(x < WIDTH/3)
+	return 1;
+
+    else if(x<2*WIDTH/3)
+	return 2;
+
+    else
+	return 3;
+}
+
+int getMouseInput(int *x, int *y){
+	int c;
+   while(1)
+   {
+        c = getch();
+        switch(c)
+        {    case KEY_MOUSE:
+            if(getmouse(&event) == OK)
+            {    /* When the user clicks left mouse button */
+                if(event.bstate & BUTTON1_PRESSED)
+                {
+                	*x = event.x + 1;
+                	*y = event.y + 1;
+                	return 1;
+                }
+            }
+    	}
+    }
+}
 
 int getCurl(char *recipe, char *file_n)
 {
@@ -197,8 +273,11 @@ int main()
 	fprintf(stderr, "Error initialising ncurses.\n");
 	exit(1);
     }
+    menu_win = newwin(HEIGHT, WIDTH, starty, startx);
+    keypad(mainwin, TRUE);
+    mousemask(ALL_MOUSE_EVENTS, NULL);
 
-    getCurl("recipeList.txt","recipeList.txt");
+   /* getCurl("recipeList.txt","recipeList.txt");*/
     load_recipes();
     getCurl("UIDList.csv","file.csv");
     readCsv("./file.csv");
@@ -216,90 +295,86 @@ void getRecipe(int i, char *j)
 	strcpy(j,RECIPES_LIST[i]);
 }
 
-void decodeState()
+void decodeState(int x, int y)
 {
       	if (CURRENT_STATE == 1)
       	{
 		char uid[12];
 		int i;
-        	switch(button){
-          		case 1:clear(); move(0,0); button = 0;getUID(uid);getCurl(uids[findUID(uid)].file,"recipe.txt");open_recipe("recipe.txt");  break;
-          		case 2: view_recipes(0);button = 0;CURRENT_STATE = 4; break;
-          		case 3: view_recipes(0);button = 0;CURRENT_STATE = 2; break;
-			case 4: cont = 0;
-        	}
+		if(y < HEIGHT/3)
+		{
+          		clear();
+			move(0,0);
+			button = 0;
+			scanNFC();
+			getUID(uid);
+			removeNFC();
+			getCurl(uids[findUID(uid)].file,"recipe.txt");
+			open_recipe("recipe.txt");
+		}
+
+		else if (y < 2*HEIGHT/3)
+		{
+          		view_recipes(0);
+			button = 0;
+			CURRENT_STATE = 2;
+		}
+
+		else
+			cont=0;
       	}
 
       	else if (CURRENT_STATE == 2)
       	{
-      		switch(button){
-				case 1:button = 0; printf("3\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
-				case 2:button = 0; printf("4\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
-				case 3:button = 0; printf("5\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[2 + 3 * pagenum]); break;
-				case 4:button = 0; view_recipes(++pagenum); break;
-			}
-      	}
-      	else if (CURRENT_STATE == 3)
-      	{
-			switch(button){
-		      		case 1 : printf("3\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[0 + 3 * pagenum]); break;
-				case 2 : printf("4\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[1 + 3 * pagenum]); break;
-				case 3 : printf("5\n"); clear(); move(0,0); open_recipe(RECIPES_LIST[2 + 3 * pagenum]); break;
-				case 4 : main_menu(); break;
-			}
+		if (y>= menuStart)
+		{
+			int i = getOptionWindow(x);
+			if (i ==1)
+				view_recipes(++pagenum);
+			if (i == 2)
+				main_menu();
+			if (i == 3)
+				cont = 0;
+		}
+
+		else if (y > displayedRecipes*4+2)
+		{
+		}
+		else
+		{
+	      		char uid[12], recipe[512];
+			getRecipe((y-2)/4,recipe);
+			scanNFC();
+			getUID(uid);
+			writeUID(uid,recipe);
+			main_menu();
+		}
       	}
 
-      	else if (CURRENT_STATE == 4)
-      	{
-      		char uid[12], recipe[512];
-			switch(button){
-				case 1 : clear(); move(0,0);getRecipe(0+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
-				case 2 : clear(); move(0,0);getRecipe(1+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
-				case 3 : clear(); move(0,0);getRecipe(2+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
-				case 4:button = 0; view_recipes(++pagenum); break;
-			}
-	}
       	else if (CURRENT_STATE == 5)
       	{
-			switch(button){
-				case 1 : button = 0;print_recipe_page(nexttext);break;
-				case 4 : main_menu(); break;
-				default: button = 0; break;
-
-
-			}
+		if (y>= menuStart)
+		{
+			int i = getOptionWindow(x);
+			if (i ==1)
+				print_recipe_page(nexttext);
+			if (i == 2)
+				main_menu();
+			if (i == 3)
+				cont = 0;
+		}
       	}
-      	else if (CURRENT_STATE == 6)
-      	{
-      		char uid[12], recipe[512];
-			switch(button){
-				case 1 : clear(); move(0,0);getRecipe(0+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
-				case 2 : clear(); move(0,0);getRecipe(1+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
-				case 3 : clear(); move(0,0);getRecipe(2+3*pagenum,recipe); getUID(uid); writeUID(uid,recipe); main_menu();break;
-				case 4 : button = 0; main_menu();  break;
-			}
-	}
-
-	delay(200);
 }
 
 void waitForInput()
 {
-  while (cont)
-  {
-    if (button)
-      decodeState();
-    else
+    while (cont)
     {
-	int c = getchar();
-	switch (c){
-		case '1': button = 1; break;
-		case '2': button = 2; break;
-		case '3': button = 3; break;
-		case '0': button = 4; break;
-	}
+	int x = 0, y = 0;
+    	if (getMouseInput(&x, &y)){
+		decodeState(x,y);
+    	}
     }
-  }
 
 }
 
@@ -309,18 +384,35 @@ void main_menu()
 	CURRENT_STATE = 1;
 	pagenum = 0;
 	clear();
-	move(0,0);
-	addstr("Welcome to the NFC CookBook...");
-	move(2,4);
-	addstr("1) Scan card");
-	move(3,4);
-	addstr("2) Assign new card");
-	move(4,4);
-	addstr("3) View recipes");
-	move(5,4);
-	addstr("0) Exit");
-	refresh();
+    box(menu_win,0,0);
+    int x, y, i;
+    x = 2;
+    y = 2;
+
+    // for (i = 1;i < HEIGHT-1; i++)
+    // {
+    //     mvwaddch(menu_win,i,WIDTH/2,'|');
+    // }
+    for (i = 1;i < WIDTH; i++)
+    {
+	mvaddch(starty,i + startx,'-');
+	mvaddch(starty + HEIGHT - 1, i + startx, '-');
+        mvaddch(HEIGHT/3 + starty,i + startx,'-');
+        mvaddch(2*(HEIGHT/3) + starty,i + startx,'-');
+    }
+	for (i = 1;i<HEIGHT-1;i++)
+	{
+		mvaddch(i+starty,startx,'|');
+		mvaddch(i+starty,WIDTH + startx, '|');
+	}
+
+    mvprintw((HEIGHT/6)+ starty, (WIDTH/2)-(strlen(choices[0])/2)+ startx, "%s", choices[0]);
+    mvprintw(3*(HEIGHT/6)+ starty, (WIDTH/2)-(strlen(choices[1])/2) + startx, "%s", choices[1]);
+    mvprintw(5*(HEIGHT/6)+ starty, (WIDTH/2)-(strlen(choices[2])/2) + startx, "%s", choices[2]);
+
+    refresh();
 }
+
 
 void view_recipes(int page)
 {
@@ -329,42 +421,24 @@ void view_recipes(int page)
 	clear();
 	move(0,0);
 	addstr("Recipes on file:");
+	displayedRecipes = 0;
+	optionsWindow();
 
 	if (NUM_OF_RECIPES < 1 || NUM_OF_RECIPES == (int)NULL)
 	{
 		move(3,0);
 		addstr("No recipes found...");
-		move(5,4);
-		addstr("0) Back to Main Menu");
-		refresh();
-
 	}
 	else {
 		int i;
 		char message[1024];
-		for (i = 0; (i + 3*pagenum) < NUM_OF_RECIPES && i < 3; i = i + 1)
+		for (i = 0; (i + 10*pagenum) < NUM_OF_RECIPES && i < 10; i = i + 1)
 		{
-			move(2+i,4);
-			sprintf(message,"%d) %s\n", (i + 1), RECIPES_LIST[i + 3 * pagenum]);
+			displayedRecipes++;
+			move(2+4*i,4);
+			sprintf(message,"%d) %s\n", (i + 1), RECIPES_LIST[i + 10 * pagenum]);
 			addstr(message);
 		}
-
-		if (NUM_OF_RECIPES > (3 * (pagenum + 1)))
-		{
-			move(2+i,4);
-			addstr("0) Next Page\n");
-		}
-		else
-		{
-			if (CURRENT_STATE == 2)
-				CURRENT_STATE = 3;
-			else
-				CURRENT_STATE = 6;
-
-			move(2+i,4);
-			addstr("0) Back to Main Menu\n\n");
-		}
-		refresh();
 	}
 }
 
@@ -418,7 +492,7 @@ void load_recipes()
 	{
 		if(recipes[i] == '\n')
 		{
-			strncpy(RECIPES_LIST[NUM_OF_RECIPES++],&recipes[i-j],j+1);
+			strncpy(RECIPES_LIST[NUM_OF_RECIPES++],&recipes[i-j],j);
 			/*RECIPES_LIST[NUM_OF_RECIPES][j] = '\0';*/
 			j = 0;
 			i++;
@@ -501,8 +575,7 @@ void print_recipe_page(char text[])
 		clear();
 		move(0,0);
 		addstr(text);
-		move((rows - 1), 0);
-		addstr("0) Back to Main Menu");
+		optionsWindow();
 		refresh();
 	}
 	else {
@@ -532,14 +605,12 @@ void print_recipe_page(char text[])
 
 
 		strcpy(nexttext, &text[upto]);
-
 		clear();
 		move(0,0);
 		addstr(part);
-		move((w.ws_row - 2), 0);
-		addstr("1) Next Page");
-		move((w.ws_row - 1), 0);
-		addstr("0) Main Menu");
+
+		optionsWindow();
+
 		refresh();
 	}
 
